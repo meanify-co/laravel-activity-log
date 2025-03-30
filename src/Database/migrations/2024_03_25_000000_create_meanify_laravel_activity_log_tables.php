@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('request_logs', function (Blueprint $table) {
             $table->id();
-            $table->string('account_id')->nullable();
-            $table->string('user_id')->nullable();
+            $table->unsignedBigInteger('account_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->uuid('request_uuid')->nullable();
             $table->uuid('telescope_uuid')->nullable();
             $table->ipAddress('ip_address')->nullable();

@@ -43,7 +43,7 @@ class MeanifyLaravelActivityLogRequestInterceptor
                 'request_uuid'   => $request->meanify()->headers()->get('request-uuid'),
                 'telescope_uuid' => $request->header('x-request-id'),
                 'ip_address'     => $request->meanify()->headers()->get('request-ip'),
-                'payload'        => $request->except(['password', 'token', 'new_password', 'current_password', 'confirm_password', 'new_password_confirmation']),
+                'payload'        => $request->except(config('meanify-laravel-activity-log.hidden_payload_fields', [])),
                 'response'       => method_exists($response, 'getContent') ? json_decode($response->getContent(), true) : null,
                 'started_at'     => $request->attributes->get('x-mfy-request-started-at'),
                 'finished_at'    => now(),
