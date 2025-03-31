@@ -15,6 +15,10 @@ class CrudObserver
      */
     public function created(Model $model): void
     {
+        if ($this->shouldIgnore($model, 'created')) {
+            return;
+        }
+
         $this->log('created', $model, null, null, $model->toArray());
     }
 
@@ -32,20 +36,7 @@ class CrudObserver
             return;
         }
 
-        $ignoreRules = config('meanify-laravel-activity-log.ignore_changes')[get_class($model)] ?? null;
-        if (is_array($ignoreRules) && !array_diff(array_keys($changes), $ignoreRules)) {
-            return;
-        }
-        if (is_callable($ignoreRules) && $ignoreRules($changes)) {
-            return;
-        }
-
-        $systemCfg = config('meanify-laravel-activity-log.ignore_system_changes');
-        if (
-            ($systemCfg['enabled'] ?? false) &&
-            App::runningInConsole() &&
-            !$this->shouldLogSystemChange(get_class($model), $changes)
-        ) {
+        if ($this->shouldIgnore($model, 'updated', $changes)) {
             return;
         }
 
@@ -65,6 +56,10 @@ class CrudObserver
      */
     public function deleted(Model $model): void
     {
+        if ($this->shouldIgnore($model, 'deleted')) {
+            return;
+        }
+
         $this->log('deleted', $model, $model->getOriginal(), null, null);
     }
 
@@ -74,6 +69,10 @@ class CrudObserver
      */
     public function forceDeleted(Model $model): void
     {
+        if ($this->shouldIgnore($model, 'force_deleted')) {
+            return;
+        }
+
         $this->log('force_deleted', $model, $model->getOriginal(), null, null);
     }
 
@@ -83,7 +82,66 @@ class CrudObserver
      */
     public function restored(Model $model): void
     {
+        if ($this->shouldIgnore($model, 'restored')) {
+            return;
+        }
+
         $this->log('restored', $model, null, null, $model->toArray());
+    }
+
+    /**
+     * @param Model $model
+     * @param string $action
+     * @param array $changes
+     * @return bool
+     */
+    protected function shouldIgnore(Model $model, string $action, array $changes = []): bool
+    {
+        $class = get_class($model);
+
+        // Model-level flag
+        if (property_exists($model, 'meanify_log_enabled') && $model::$meanify_log_enabled === false) {
+            return true;
+        }
+        
+        // Ignore specific actions
+        if (property_exists($model, 'meanify_log_ignore_actions') && in_array($action, $model::$meanify_log_ignore_actions ?? [])) {
+            return true;
+        }
+
+        // Ignore changes (columns or closure)
+        if (!empty($changes)) {
+            $ignore = $model::$meanify_log_ignore_changes ?? config("meanify-laravel-activity-log.ignore_changes.{$class}");
+            if (is_array($ignore) && !array_diff(array_keys($changes), $ignore)) {
+                return true;
+            }
+            if (is_callable($ignore) && $ignore($changes)) {
+                return true;
+            }
+        }
+
+        // Ignore if from system (CLI or background)
+        $ignore_system = $model::$meanify_log_ignore_system ?? config('meanify-laravel-activity-log.ignore_system_changes.enabled', false);
+
+        if ($ignore_system && App::runningInConsole()) {
+            // Check exceptions
+            $except = $model::$meanify_log_ignore_system_except ?? config('meanify-laravel-activity-log.ignore_system_changes.except')[$class] ?? null;
+
+            if (is_array($except) && !array_diff(array_keys($changes), $except)) {
+                return false; // explicitly allow
+            }
+            if (is_callable($except) && $except($changes)) {
+                return false; // explicitly allow
+            }
+
+            if (method_exists($model, 'meanifyLogIgnoreSystemCondition')) {
+                return !$model::meanifyLogIgnoreSystemCondition($changes);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -117,27 +175,10 @@ class CrudObserver
             'original' => $original,
             'changes' => $changes,
             'final' => $final,
-            'user_id' => request()->meanify()->headers()->get('user-id'),
-            'account_id' => request()->meanify()->headers()->get('account-id'),
-            'request_uuid' => request()->meanify()->headers()->get('request-uuid'),
-            'ip_address' => request()->meanify()->headers()->get('request-ip'),
+            'user_id' => request()->header('x-mfy-user-id'),
+            'account_id' => request()->header('x-mfy-account-id'),
+            'request_uuid' => request()->header('x-mfy-request-uuid'),
+            'ip_address' => request()->header('x-mfy-request-ip'),
         ]);
     }
-
-    /**
-     * @param string $modelClass
-     * @param array $changes
-     * @return bool
-     */
-    protected function shouldLogSystemChange(string $modelClass, array $changes): bool
-    {
-        $exceptions = config('meanify-laravel-activity-log.ignore_system_changes.except', []);
-
-        if (isset($exceptions[$modelClass])) {
-            $rule = $exceptions[$modelClass];
-            return is_callable($rule) ? $rule($changes) : (bool) $rule;
-        }
-
-        return false;
-    }
-} 
+}

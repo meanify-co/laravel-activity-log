@@ -28,22 +28,6 @@ class MeanifyLaravelActivityLogServiceProvider extends ServiceProvider
             __DIR__ . '/../../src/Models/ActivityLog.php'    => app_path('Models/ActivityLog.php'),
             __DIR__ . '/../../src/Models/RequestLog.php'     => app_path('Models/RequestLog.php'),
         ], 'meanify-models');
-
-        //headers
-        Request::macro('meanify', function () {
-            return new class {
-                public function headers(): \Illuminate\Support\Collection
-                {
-                    return collect(request()->headers->all())
-                        ->filter(fn ($_, $key) => str_starts_with($key, 'x-mfy-'))
-                        ->map(fn ($value) => $value[0] ?? null);
-                }
-                public function setHeader(string $key, mixed $value): void
-                {
-                    request()->headers->set("x-mfy-{$key}", $value);
-                }
-            };
-        });
     }
 
     public function register(): void
