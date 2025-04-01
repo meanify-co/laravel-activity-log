@@ -100,18 +100,18 @@ class CrudObserver
         $class = get_class($model);
 
         // Model-level flag
-        if (property_exists($model, 'meanify_log_enabled') && $model::$meanify_log_enabled === false) {
+        if (property_exists($model, 'MEANIFY_LOG_ENABLED') && $model::$MEANIFY_LOG_ENABLED === false) {
             return true;
         }
         
         // Ignore specific actions
-        if (property_exists($model, 'meanify_log_ignore_actions') && in_array($action, $model::$meanify_log_ignore_actions ?? [])) {
+        if (property_exists($model, 'MEANIFY_LOG_IGNORE_ACTIONS') && in_array($action, $model::$MEANIFY_LOG_IGNORE_ACTIONS ?? [])) {
             return true;
         }
 
         // Ignore changes (columns or closure)
         if (!empty($changes)) {
-            $ignore = $model::$meanify_log_ignore_changes ?? config("meanify-laravel-activity-log.ignore_changes.{$class}");
+            $ignore = $model::$MEANIFY_LOG_IGNORE_CHANGES ?? config("meanify-laravel-activity-log.ignore_changes.{$class}");
             if (is_array($ignore) && !array_diff(array_keys($changes), $ignore)) {
                 return true;
             }
@@ -121,11 +121,11 @@ class CrudObserver
         }
 
         // Ignore if from system (CLI or background)
-        $ignore_system = $model::$meanify_log_ignore_system ?? config('meanify-laravel-activity-log.ignore_system_changes.enabled', false);
+        $ignore_system = $model::$MEANIFY_LOG_IGNORE_SYSTEM ?? config('meanify-laravel-activity-log.ignore_system_changes.enabled', false);
 
         if ($ignore_system && App::runningInConsole()) {
             // Check exceptions
-            $except = $model::$meanify_log_ignore_system_except ?? config('meanify-laravel-activity-log.ignore_system_changes.except')[$class] ?? null;
+            $except = $model::$MEANIFY_LOG_IGNORE_SYSTEM_EXCEPT ?? config('meanify-laravel-activity-log.ignore_system_changes.except')[$class] ?? null;
 
             if (is_array($except) && !array_diff(array_keys($changes), $except)) {
                 return false; // explicitly allow
